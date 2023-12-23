@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
-	"sort"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
@@ -19,10 +18,20 @@ type LivestreamStatistics struct {
 }
 
 type LivestreamRankingEntry struct {
-	LivestreamID int64
-	Score        int64
+	LivestreamID int64 `sql:"livestream_id"`
+	Score        int64 `sql:"score"`
 }
 type LivestreamRanking []LivestreamRankingEntry
+
+type LiveStreamReaction struct {
+	LiveStreamID int64 `db:"livestream_id"`
+	Count        int64 `db:"count"`
+}
+
+type LiveStreamTip struct {
+	LiveStreamID int64 `db:"livestream_id"`
+	Tip          int64 `db:"tip"`
+}
 
 func (r LivestreamRanking) Len() int      { return len(r) }
 func (r LivestreamRanking) Swap(i, j int) { r[i], r[j] = r[j], r[i] }
@@ -49,16 +58,8 @@ type UserRankingEntry struct {
 }
 type UserRanking []UserRankingEntry
 
-type UserReactions struct {
-	ID           int64  `db:"id"`
-	Name    string `db:"name"`
-	ReactionCount   int64  `db:"reaction_count"`
-}
-
-type UserTips struct {
-	ID           int64  `db:"id"`
-	Name    string `db:"name"`
-	Tip       int64  `db:"tip"`
+type UserRank struct {
+	Rank int64 `sql:"rank"`
 }
 
 func (r UserRanking) Len() int      { return len(r) }
@@ -99,99 +100,35 @@ func getUserStatisticsHandler(c echo.Context) error {
 	}
 
 	// ランク算出
-	var users []*UserModel
-	if err := tx.SelectContext(ctx, &users, "SELECT * FROM users"); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get users: "+err.Error())
-	}
-
-	var ranking UserRanking
-
-
-	userReactions := []UserReactions{}
-	reaction_query := `
-	SELECT
-		u.id,
-		u.name,
-		COALESCE(COUNT(r.livestream_id), 0) AS reaction_count
-	FROM
-		users u
-		LEFT JOIN livestreams l ON l.user_id = u.id
-		LEFT JOIN reactions r ON r.livestream_id = l.id
-	GROUP BY
-		u.id, u.name
-	ORDER BY
-		u.id`
-	if err := tx.SelectContext(ctx, &userReactions, reaction_query); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
-	}
-	userTips := []UserTips{}
-	tip_query := `
-	SELECT
-		u.id,
-		u.name,
-		IFNULL(SUM(l2.tip), 0) AS tip
-	FROM
-		users u
-		LEFT JOIN livestreams l ON l.user_id = u.id
-		LEFT JOIN livecomments l2 ON l2.livestream_id = l.id
-	GROUP BY
-		u.id
-	ORDER BY
-		u.id`
-	if err := tx.SelectContext(ctx, &userTips, tip_query); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
-	}
-	var i = 0
-	for _, user := range userReactions {
-		score := user.ReactionCount + userTips[i].Tip
-		ranking = append(ranking, UserRankingEntry{
-			Username: user.Name,
-			Score: score,
-		})
-		i++
-	}
-
-	// for _, user := range users {
-	// 	var reactions int64
-	// 	query := `
-	// 	SELECT COUNT(*) FROM users u
-	// 	INNER JOIN livestreams l ON l.user_id = u.id
-	// 	INNER JOIN reactions r ON r.livestream_id = l.id
-	// 	WHERE u.id = ?`
-	// 	if err := tx.GetContext(ctx, &reactions, query, user.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-	// 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
-	// 	}
-
-	// 	var tips int64
-	// 	query = `
-	// 	SELECT IFNULL(SUM(l2.tip), 0) FROM users u
-	// 	INNER JOIN livestreams l ON l.user_id = u.id	
-	// 	INNER JOIN livecomments l2 ON l2.livestream_id = l.id
-	// 	WHERE u.id = ?`
-	// 	if err := tx.GetContext(ctx, &tips, query, user.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-	// 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
-	// 	}
-
-	// 	score := reactions + tips
-	// 	ranking = append(ranking, UserRankingEntry{
-	// 		Username: user.Name,
-	// 		Score:    score,
-	// 	})
-	// }
-	sort.Sort(ranking)
-
-	var rank int64 = 1
-	for i := len(ranking) - 1; i >= 0; i-- {
-		entry := ranking[i]
-		if entry.Username == username {
-			break
+	var rank int64
+	query := `SELECT rnk
+	FROM (
+	  SELECT u.name AS username, RANK() OVER (ORDER BY scoreboard.score DESC, u.name DESC) AS rnk
+	  FROM (
+		SELECT id, SUM(score) AS score
+		FROM (
+		  SELECT id, 0 AS score FROM users
+		  UNION ALL
+		  SELECT l.user_id AS id, COUNT(*) AS score FROM reactions AS r INNER JOIN livestreams AS l ON r.livestream_id = l.id GROUP BY l.user_id
+		  UNION ALL
+		  SELECT ls.user_id AS id, IFNULL(SUM(c.tip), 0) AS score FROM livecomments AS c INNER JOIN livestreams AS ls ON c.livestream_id = ls.id GROUP BY ls.user_id
+		) AS allscores
+		GROUP BY id
+	  ) AS scoreboard
+	  INNER JOIN users AS u ON scoreboard.id = u.id
+	) AS result
+	WHERE username = ?`
+	if err := tx.GetContext(ctx, &rank, query, username); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return echo.NewHTTPError(http.StatusBadRequest, "not found user that has the given username")
+		} else {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user: "+err.Error())
 		}
-		rank++
 	}
 
 	// リアクション数
 	var totalReactions int64
-	query := `SELECT COUNT(*) FROM users u 
+	query = `SELECT COUNT(*) FROM users u 
     INNER JOIN livestreams l ON l.user_id = u.id 
     INNER JOIN reactions r ON r.livestream_id = l.id
     WHERE u.name = ?
@@ -201,33 +138,28 @@ func getUserStatisticsHandler(c echo.Context) error {
 	}
 
 	// ライブコメント数、チップ合計
-	var totalLivecomments int64
-	var totalTip int64
-	var livestreams []*LivestreamModel
-	if err := tx.SelectContext(ctx, &livestreams, "SELECT * FROM livestreams WHERE user_id = ?", user.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
+	var total struct {
+		Livecomments int64 `db:"cnt"`
+		Tip int64 `db:"tip"`
 	}
-
-	for _, livestream := range livestreams {
-		var livecomments []*LivecommentModel
-		if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments WHERE livestream_id = ?", livestream.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livecomments: "+err.Error())
-		}
-
-		for _, livecomment := range livecomments {
-			totalTip += livecomment.Tip
-			totalLivecomments++
-		}
+	query = `SELECT COUNT(*) AS cnt, IFNULL(SUM(c.tip), 0) AS tip
+	FROM livecomments AS c
+	INNER JOIN livestreams AS ls ON c.livestream_id = ls.id
+	INNER JOIN users AS u ON ls.user_id = u.id
+	WHERE u.name = ?`
+	if err := tx.GetContext(ctx, &total, query, username); err != nil  && !errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count total livecomments and tips: "+err.Error())
 	}
 
 	// 合計視聴者数
 	var viewersCount int64
-	for _, livestream := range livestreams {
-		var cnt int64
-		if err := tx.GetContext(ctx, &cnt, "SELECT COUNT(*) FROM livestream_viewers_history WHERE livestream_id = ?", livestream.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestream_view_history: "+err.Error())
-		}
-		viewersCount += cnt
+	query = `SELECT COUNT(*)
+	FROM livestream_viewers_history AS h
+	INNER JOIN livestreams AS ls ON h.livestream_id = ls.id
+	INNER JOIN users AS u ON ls.user_id = u.id
+	WHERE u.name = ?`
+	if err := tx.GetContext(ctx, &viewersCount, query, username); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count total reactions: "+err.Error())
 	}
 
 	// お気に入り絵文字
@@ -250,8 +182,8 @@ func getUserStatisticsHandler(c echo.Context) error {
 		Rank:              rank,
 		ViewersCount:      viewersCount,
 		TotalReactions:    totalReactions,
-		TotalLivecomments: totalLivecomments,
-		TotalTip:          totalTip,
+		TotalLivecomments: total.Livecomments,
+		TotalTip:          total.Tip,
 		FavoriteEmoji:     favoriteEmoji,
 	}
 	return c.JSON(http.StatusOK, stats)

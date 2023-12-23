@@ -26,7 +26,6 @@ NGINX_RESTART = sudo systemctl restart nginx.service
 APP_RESTART = sudo systemctl restart isupipe-go.service
 GIT_PULL = git reset --hard HEAD && git checkout main && git pull
 GO_BUILD = cd "$(PWD)/go/" && make build 
-SQL_BUILD = cp -rf "$(PWD)/sql" /home/isucon/webapp
 SQL_RUN = mysql -h 127.0.0.1 -uisucon -pisucon isupipe < "$(PWD)/sql/initdb.d/10_schema.sql"
 MYSQL_INIT = bash /home/isucon/webapp/sql/init.sh
 
@@ -35,7 +34,6 @@ build:
 	$(GIT_PULL)
 	$(GO_BUILD)
 	$(APP_RESTART)
-	$(SQL_BUILD)
 	$(SQL_RUN)
 	$(MYSQL_RESTART)
 	$(MYSQL_INIT)

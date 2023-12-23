@@ -396,7 +396,7 @@ func moderateHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get NG words: "+err.Error())
 	}
 	var livecomments []*LivecommentModel
-	if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments WHERE livestream_id = ?", livestreamID); err != nil {
+	if err := tx.SelectContext(ctx, &livecomments, "SELECT * FROM livecomments WHERE livestream_id = ?", live); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livecomments: "+err.Error())
 	}
 	// NGワードにヒットする過去の投稿も全削除する
@@ -405,7 +405,7 @@ func moderateHandler(c echo.Context) error {
 		for _, livecomment := range livecomments {
 			    word := ngword.Word
 				comment := livecomment.Comment
-				if strings.Contains(comment, word) {
+				if strings.Contains(strings.ToLower(comment), strings.ToLower(word)) {
 					deleteIds = append(deleteIds, livecomment.ID)
 				}
 		}

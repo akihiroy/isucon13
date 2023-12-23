@@ -441,7 +441,7 @@ func fillLivecommentResponse(ctx context.Context, tx *sqlx.Tx, livecommentModel 
 		return Livecomment{}, err
 	}
 
-	if livestream != nil {
+	if livestream == nil {
 		livestreamModel := LivestreamModel{}
 		if err := tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livecommentModel.LivestreamID); err != nil {
 			return Livecomment{}, err

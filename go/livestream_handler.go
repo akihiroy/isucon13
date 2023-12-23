@@ -174,36 +174,13 @@ func searchLivestreamsHandler(c echo.Context) error {
 	ctx := c.Request().Context()
 	keyTagName := c.QueryParam("tag")
 
-	tx, err := dbConn.BeginTxx(ctx, nil)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to begin transaction: "+err.Error())
-	}
-	defer tx.Rollback()
-
 	var livestreamModels []*LivestreamModel
 	if c.QueryParam("tag") != "" {
 		// タグによる取得
-		var tagIDList []int
-		if err := tx.SelectContext(ctx, &tagIDList, "SELECT id FROM tags WHERE name = ?", keyTagName); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get tags: "+err.Error())
-		}
-
-		query, params, err := sqlx.In("SELECT * FROM livestream_tags WHERE tag_id IN (?) ORDER BY livestream_id DESC", tagIDList)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to construct IN query: "+err.Error())
-		}
-		var keyTaggedLivestreams []*LivestreamTagModel
-		if err := tx.SelectContext(ctx, &keyTaggedLivestreams, query, params...); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get keyTaggedLivestreams: "+err.Error())
-		}
-
-		for _, keyTaggedLivestream := range keyTaggedLivestreams {
-			ls := LivestreamModel{}
-			if err := tx.GetContext(ctx, &ls, "SELECT * FROM livestreams WHERE id = ?", keyTaggedLivestream.LivestreamID); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
-			}
-
-			livestreamModels = append(livestreamModels, &ls)
+		tagID := FindTagByName(keyTagName)
+		query := "SELECT s.* FROM livestreams AS s INNER JOIN livestream_tags AS t ON t.livestream_id = s.id AND t.tag_id = ? ORDER BY s.id DESC"
+		if err := sqlx.SelectContext(ctx, dbConn, &livestreamModels, query, tagID); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
 		}
 	} else {
 		// 検索条件なし
@@ -216,10 +193,16 @@ func searchLivestreamsHandler(c echo.Context) error {
 			query += fmt.Sprintf(" LIMIT %d", limit)
 		}
 
-		if err := tx.SelectContext(ctx, &livestreamModels, query); err != nil {
+		if err := sqlx.SelectContext(ctx, dbConn, &livestreamModels, query); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
 		}
 	}
+
+	tx, err := dbConn.BeginTxx(ctx, nil)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to begin transaction: "+err.Error())
+	}
+	defer tx.Rollback()
 
 	livestreams := make([]Livestream, len(livestreamModels))
 	for i := range livestreamModels {

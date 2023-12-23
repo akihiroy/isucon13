@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,10 +86,16 @@ type PostIconResponse struct {
 	ID int64 `json:"id"`
 }
 
+var iconCache = sync.Map{}
+
 func getIconHandler(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	username := c.Param("username")
+
+	if v, ok := iconCache.Load(username); ok {
+		return c.Blob(http.StatusOK, "image/jpeg", v.([]byte))
+	}
 
 	tx, err := dbConn.BeginTxx(ctx, nil)
 	if err != nil {
@@ -148,6 +155,13 @@ func postIconHandler(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert new user icon: "+err.Error())
 	}
+	// get user name
+	var username string
+	if err := tx.GetContext(ctx, &username, "SELECT name FROM users WHERE id = ?", userID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user name: "+err.Error())
+	}
+
+	iconCache.Store(userID, req.Image)
 
 	iconID, err := rs.LastInsertId()
 	if err != nil {

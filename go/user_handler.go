@@ -86,7 +86,7 @@ type PostIconResponse struct {
 	ID int64 `json:"id"`
 }
 
-var iconHash = sync.Map{}
+var iconHashes = sync.Map{}
 
 func getIconHandler(c echo.Context) error {
 	ctx := c.Request().Context()
@@ -95,8 +95,7 @@ func getIconHandler(c echo.Context) error {
 
 	// get If-None-Match header as Icon Hash
 	ifNoneMatch := c.Request().Header.Get("If-None-Match")
-	fmt.Printf("If-None-Match: %s\n", ifNoneMatch)
-	if _, ok := iconHash.Load(ifNoneMatch); ok {
+	if _, ok := iconHashes.Load(ifNoneMatch); ok {
 		return c.NoContent(http.StatusNotModified)
 	}
 
@@ -166,7 +165,7 @@ func postIconHandler(c echo.Context) error {
 	}
 
 	// set Icon Hash
-	iconHash.Store(fmt.Sprintf("%x", sha256.Sum256(req.Image)), username)
+	iconHashes.Store(fmt.Sprintf("\"%x\"", sha256.Sum256(req.Image)), username)
 
 	iconID, err := rs.LastInsertId()
 	if err != nil {

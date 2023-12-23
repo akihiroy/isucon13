@@ -106,8 +106,16 @@ setup:
 	bash setup/install_alp.sh
 	bash setup/install_query_digester.sh
 
+SLOWLOG=/var/log/mysql/mysql-slow.log
+SLOWLOG_CONFIG="SET GLOBAL slow_query_log = ON; SET GLOBAL long_query_time = 0; SET GLOBAL slow_query_log_file = $(SLOWLOG);"
+SLOWLOG_RESET="SET GLOBAL slow_query_log = OFF; SET GLOBAL long_query_time = 10;"
+ENABLE_SLOWLOG=sudo mysql -h$(MYSQL_HOST) -u$(USER) -p$(MYSQL_PASSWORD) -e $(SLOWLOG_CONFIG)
+DISABLE_SLOWLOG=sudo mysql -h$(MYSQL_HOST) -u$(USER) -p$(MYSQL_PASSWORD) -e $(SLOWLOG_RESET)
 
 .PHONY: bench
 bench: nginx-rotate restart
+	$(ENABLE_SLOWLOG)
 	/home/isucon/bench run --enable-ssl
+	$(DISABLE_SLOWLOG)
+	$(SHOW_DIGEST)
 	$(ALP)

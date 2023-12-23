@@ -52,13 +52,13 @@ type UserRanking []UserRankingEntry
 type UserReactions struct {
 	ID           int64  `db:"id"`
 	Name    string `db:"name"`
-	reaction_count   int64  `db:"reaction_count"`
+	ReactionCount   int64  `db:"reaction_count"`
 }
 
 type UserTips struct {
 	ID           int64  `db:"id"`
 	Name    string `db:"name"`
-	tip       int64  `db:"tip"`
+	Tip       int64  `db:"tip"`
 }
 
 func (r UserRanking) Len() int      { return len(r) }
@@ -143,7 +143,7 @@ func getUserStatisticsHandler(c echo.Context) error {
 	}
 	var i = 1
 	for _, user := range userReactions {
-		score := user.reaction_count + userTips[i].tip
+		score := user.ReactionCount + userTips[i].Tip
 		ranking = append(ranking, UserRankingEntry{
 			Username: user.Name,
 			Score: score,

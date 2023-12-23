@@ -64,10 +64,11 @@ nginx-rotate:
 # ログはJSON形式想定、違ったら変えて
 # https://github.com/tkuchiki/alp/blob/main/docs/usage_samples.ja.md ここ参考のこと
 LOGFILE=$(shell ls -1t /var/log/nginx/*.log* |head -n 1)
+ALP=sudo cat $(LOGFILE) | alp json --sort sum --reverse -m "/api/livestream/\d+/statistics,/api/livestream/\d+/livecomment,/api/livestream/\d+/moderate,/api/livestream/\d+/enter,/api/livestream/\d+/exit,/api/livestream/\d+/reaction,/api/livestream/\d+$$,/api/livestream/\d+/report,/api/livestream/\d+/ngwords,/api/user/[0-9a-zA-Z]+$$,/api/user/[0-9a-zA-Z]+/statistics,/api/user/[0-9a-zA-Z]+/icon,/api/user/[0-9a-zA-Z]+/livestream,/api/user/[0-9a-zA-Z]+/theme,/watch/\d+$$"
 .PHONY: alp
 alp:
 	echo $(LOGFILE)
-	sudo cat $(LOGFILE) | alp json --sort sum --reverse -m "/api/livestream/\d+/statistics,/api/livestream/\d+/livecomment,/api/livestream/\d+/moderate,/api/livestream/\d+/enter,/api/livestream/\d+/exit,/api/livestream/\d+/reaction,/api/livestream/\d+$$,/api/livestream/\d+/report,/api/livestream/\d+/ngwords,/api/user/[0-9a-zA-Z]+$$,/api/user/[0-9a-zA-Z]+/statistics,/api/user/[0-9a-zA-Z]+/icon,/api/user/[0-9a-zA-Z]+/livestream,/api/user/[0-9a-zA-Z]+/theme,/watch/\d+$$"
+	$(ALP)
 
 # MySQL
 MYSQL_HOST=127.0.0.1
@@ -88,17 +89,25 @@ mysql:
 mysql-restart:
 	$(MYSQL_RESTART)
 
+QUERY_DIGESTER=sudo query-digester -duration 10
+SHOW_DIGEST=bash scripts/show-digest.sh
 .PHONY: slowlog
 slowlog:
-	sudo query-digester -duration 10
-	bash query-digest.sh
+	$(QUERY_DIGESTER)
+	$(SHOW_DIGEST)
 
-.PHONY: slowlog
+.PHONY: slowlast
 slowlast:
-	bash query-digest.sh
+	$(SHOW_DIGEST)
 
 
 .PHONY: setup
 setup:
 	bash setup/install_alp.sh
 	bash setup/install_query_digester.sh
+
+
+.PHONY: bench
+bench: nginx-rotate restart
+	./bench run --enable-ssl
+	$(ALP)

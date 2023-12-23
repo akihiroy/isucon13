@@ -52,13 +52,13 @@ type UserRanking []UserRankingEntry
 type UserReactions struct {
 	ID           int64  `db:"id"`
 	Name    string `db:"name"`
-	Score       int64  `db:"reaction_count"`
+	reaction_count   int64  `db:"reaction_count"`
 }
 
 type UserTips struct {
 	ID           int64  `db:"id"`
 	Name    string `db:"name"`
-	Score       int64  `db:"tip"`
+	tip       int64  `db:"tip"`
 }
 
 func (r UserRanking) Len() int      { return len(r) }

@@ -177,10 +177,12 @@ func searchLivestreamsHandler(c echo.Context) error {
 	var livestreamModels []*LivestreamModel
 	if c.QueryParam("tag") != "" {
 		// タグによる取得
-		tagID := FindTagByName(keyTagName)
-		query := "SELECT s.* FROM livestreams AS s INNER JOIN livestream_tags AS t ON t.livestream_id = s.id AND t.tag_id = ? ORDER BY s.id DESC"
-		if err := sqlx.SelectContext(ctx, dbConn, &livestreamModels, query, tagID); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
+		tag := FindTagByName(keyTagName)
+		if tag != nil {
+			query := "SELECT s.* FROM livestreams AS s INNER JOIN livestream_tags AS t ON t.livestream_id = s.id AND t.tag_id = ? ORDER BY s.id DESC"
+			if err := sqlx.SelectContext(ctx, dbConn, &livestreamModels, query, tag.ID); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
+			}
 		}
 	} else {
 		// 検索条件なし

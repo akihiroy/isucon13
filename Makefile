@@ -90,7 +90,7 @@ mysql-restart:
 
 .PHONY: slowlog
 slowlog:
-	sudo query-digester -duration 30
+	sudo query-digester -duration 10
 	bash query-digest.sh
 
 .PHONY: slowlog

@@ -115,9 +115,10 @@ DISABLE_SLOWLOG=sudo mysql -h$(MYSQL_HOST) -u$(USER) -p$(MYSQL_PASSWORD) -e $(SL
 
 .PHONY: slowlog-on
 slowlog-on:
-	$(ENABLE_SLOWLOG)
 	$(ROTATE_SLOWLOG)
 	$(MYSQL_RESTART)
+	$(ENABLE_SLOWLOG)
+
 
 .PHONY: bench
 bench: nginx-rotate slowlog-on restart

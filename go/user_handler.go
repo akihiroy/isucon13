@@ -86,16 +86,19 @@ type PostIconResponse struct {
 	ID int64 `json:"id"`
 }
 
-var iconCache = sync.Map{}
+var iconHash = sync.Map{}
 
 func getIconHandler(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	username := c.Param("username")
 
-	if v, ok := iconCache.Load(username); ok {
-		return c.Blob(http.StatusOK, "image/jpeg", v.([]byte))
+	// get If-None-Match header as Icon Hash
+	ifNoneMatch := c.Request().Header.Get("If-None-Match")
+	if _, ok := iconHash.Load(ifNoneMatch); ok {
+		return c.NoContent(http.StatusNotModified)
 	}
+
 
 	tx, err := dbConn.BeginTxx(ctx, nil)
 	if err != nil {
@@ -103,8 +106,8 @@ func getIconHandler(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	var user UserModel
-	if err := tx.GetContext(ctx, &user, "SELECT * FROM users WHERE name = ?", username); err != nil {
+	var userId int64
+	if err := tx.GetContext(ctx, &userId, "SELECT user_id FROM users WHERE name = ?", username); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, "not found user that has the given username")
 		}
@@ -112,7 +115,7 @@ func getIconHandler(c echo.Context) error {
 	}
 
 	var image []byte
-	if err := tx.GetContext(ctx, &image, "SELECT image FROM icons WHERE user_id = ?", user.ID); err != nil {
+	if err := tx.GetContext(ctx, &image, "SELECT image FROM icons WHERE user_id = ?", userId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return c.File(fallbackImage)
 		} else {
@@ -161,7 +164,8 @@ func postIconHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user name: "+err.Error())
 	}
 
-	iconCache.Store(userID, req.Image)
+	// set Icon Hash
+	iconHash.Store(fmt.Sprintf("\"%x\"", sha256.Sum256(req.Image)), username)
 
 	iconID, err := rs.LastInsertId()
 	if err != nil {

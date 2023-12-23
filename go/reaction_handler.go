@@ -52,6 +52,15 @@ func getReactionsHandler(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
+	livestreamModel := LivestreamModel{}
+	if err := tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livestreamID); err != nil {
+		return err
+	}
+	livestream, err := fillLivestreamResponse(ctx, tx, livestreamModel)
+	if err != nil {
+		return err
+	}
+
 	query := "SELECT * FROM reactions WHERE livestream_id = ? ORDER BY created_at DESC"
 	if c.QueryParam("limit") != "" {
 		limit, err := strconv.Atoi(c.QueryParam("limit"))
@@ -68,7 +77,7 @@ func getReactionsHandler(c echo.Context) error {
 
 	reactions := make([]Reaction, len(reactionModels))
 	for i := range reactionModels {
-		reaction, err := fillReactionResponse(ctx, tx, reactionModels[i])
+		reaction, err := fillReactionResponse(ctx, tx, reactionModels[i], &livestream)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill reaction: "+err.Error())
 		}
@@ -129,7 +138,7 @@ func postReactionHandler(c echo.Context) error {
 	}
 	reactionModel.ID = reactionID
 
-	reaction, err := fillReactionResponse(ctx, tx, reactionModel)
+	reaction, err := fillReactionResponse(ctx, tx, reactionModel, nil)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill reaction: "+err.Error())
 	}
@@ -141,7 +150,7 @@ func postReactionHandler(c echo.Context) error {
 	return c.JSON(http.StatusCreated, reaction)
 }
 
-func fillReactionResponse(ctx context.Context, tx *sqlx.Tx, reactionModel ReactionModel) (Reaction, error) {
+func fillReactionResponse(ctx context.Context, tx *sqlx.Tx, reactionModel ReactionModel, livestream *Livestream) (Reaction, error) {
 	userModel := UserModel{}
 	if err := tx.GetContext(ctx, &userModel, "SELECT * FROM users WHERE id = ?", reactionModel.UserID); err != nil {
 		return Reaction{}, err
@@ -151,20 +160,23 @@ func fillReactionResponse(ctx context.Context, tx *sqlx.Tx, reactionModel Reacti
 		return Reaction{}, err
 	}
 
-	livestreamModel := LivestreamModel{}
-	if err := tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", reactionModel.LivestreamID); err != nil {
-		return Reaction{}, err
-	}
-	livestream, err := fillLivestreamResponse(ctx, tx, livestreamModel)
-	if err != nil {
-		return Reaction{}, err
+	if livestream == nil {
+		livestreamModel := LivestreamModel{}
+		if err := tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", reactionModel.LivestreamID); err != nil {
+			return Reaction{}, err
+		}
+		ls, err := fillLivestreamResponse(ctx, tx, livestreamModel)
+		if err != nil {
+			return Reaction{}, err
+		}
+		livestream = &ls
 	}
 
 	reaction := Reaction{
 		ID:         reactionModel.ID,
 		EmojiName:  reactionModel.EmojiName,
 		User:       user,
-		Livestream: livestream,
+		Livestream: *livestream,
 		CreatedAt:  reactionModel.CreatedAt,
 	}
 

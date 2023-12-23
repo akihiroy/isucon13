@@ -107,7 +107,7 @@ setup:
 	bash setup/install_query_digester.sh
 
 SLOWLOG=/var/log/mysql/mysql-slow.log
-ROTATE_SLOWLOG=sudo mv $(SLOWLOG) $(SLOWLOG).$(NOW)
+ROTATE_SLOWLOG=sudo test -e $(SLOWLOG) && sudo mv $(SLOWLOG) $(SLOWLOG).$(NOW) || echo "slowlog not found"
 SLOWLOG_CONFIG="SET GLOBAL slow_query_log = ON; SET GLOBAL long_query_time = 0; SET GLOBAL slow_query_log_file = \"$(SLOWLOG)\";"
 SLOWLOG_RESET="SET GLOBAL slow_query_log = OFF; SET GLOBAL long_query_time = 10;"
 ENABLE_SLOWLOG=sudo mysql -h$(MYSQL_HOST) -u$(USER) -p$(MYSQL_PASSWORD) -e $(SLOWLOG_CONFIG)
@@ -115,12 +115,14 @@ DISABLE_SLOWLOG=sudo mysql -h$(MYSQL_HOST) -u$(USER) -p$(MYSQL_PASSWORD) -e $(SL
 
 .PHONY: slowlog-on
 slowlog-on:
-	$(ENABLE_SLOWLOG)
 	$(ROTATE_SLOWLOG)
 	$(MYSQL_RESTART)
+	$(ENABLE_SLOWLOG)
+
 
 .PHONY: bench
-bench: nginx-rotate slowlog-on restart
+bench: nginx-rotate slowlog-on
 	/home/isucon/bench run --enable-ssl
-	$(SHOW_DIGEST)
+	sudo pt-query-digest /var/log/mysql/mysql-slow.log > /tmp/slow_query_$(NOW).digest
+	ls -1t /tmp/slow_query_* | head -n 1 | xargs cat
 	$(ALP)

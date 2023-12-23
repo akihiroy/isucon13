@@ -146,6 +146,7 @@ func getUserStatisticsHandler(c echo.Context) error {
 			Username: user.name,
 			Score: score,
 		})
+		i++
 	}
 
 	// for _, user := range users {

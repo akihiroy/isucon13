@@ -122,5 +122,6 @@ slowlog-on:
 .PHONY: bench
 bench: nginx-rotate slowlog-on restart
 	/home/isucon/bench run --enable-ssl
-	$(SHOW_DIGEST)
+	pt-query-digest /var/log/mysql/mysql-slow.log > /tmp/slow_query_$(date +%Y%m%d%H%M%S).digest
+	ls -1t /tmp/slow_query_* | head -n 1 | xargs cat
 	$(ALP)

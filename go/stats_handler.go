@@ -139,7 +139,7 @@ func getUserStatisticsHandler(c echo.Context) error {
 	if err := tx.SelectContext(ctx, &userTips, query); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
 	}
-	var i := 1
+	var i = 1
 	for _, user := range UserReactions {
 		score := userReactions[i].reaction_count + userTips[i].tip
 		ranking = append(ranking, UserRankingEntry{

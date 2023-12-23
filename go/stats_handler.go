@@ -106,7 +106,7 @@ func getUserStatisticsHandler(c echo.Context) error {
 
 	var ranking UserRanking
 	userReactions := []UserReactions{}
-	query := `
+	reaction_query := `
 	SELECT
 		u.id,
 		u.name,
@@ -119,11 +119,11 @@ func getUserStatisticsHandler(c echo.Context) error {
 		u.id, u.name
 	ORDER BY
 		u.id`
-	if err := tx.SelectContext(ctx, &userReactions, query); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := tx.SelectContext(ctx, &userReactions, reaction_query); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
 	}
 	userTips := []UserTips{}
-	query := `
+	tip_query := `
 	SELECT
 		u.id,
 		u.name,
@@ -136,7 +136,7 @@ func getUserStatisticsHandler(c echo.Context) error {
 		u.id
 	ORDER BY
 		u.id`
-	if err := tx.SelectContext(ctx, &userTips, query); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := tx.SelectContext(ctx, &userTips, tip_query); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
 	}
 	var i = 1

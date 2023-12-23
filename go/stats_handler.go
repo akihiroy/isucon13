@@ -141,9 +141,9 @@ func getUserStatisticsHandler(c echo.Context) error {
 	}
 	var i = 1
 	for _, user := range userReactions {
-		score := userReactions[i].reaction_count + userTips[i].tip
+		score := user.reaction_count + userTips[i].tip
 		ranking = append(ranking, UserRankingEntry{
-			Username: userReactions[i].name,
+			Username: user.name,
 			Score: score,
 		})
 	}

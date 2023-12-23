@@ -410,7 +410,11 @@ func moderateHandler(c echo.Context) error {
 				}
 		}
 	}
-	if _, err := tx.ExecContext(ctx, "DELETE FROM livecomments WHERE id IN (?)", deleteIds); err != nil {
+	query, args, err := sqlx.In("DELETE FROM livecomments WHERE id IN (?)", deleteIds)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create sqlx.In query: "+err.Error())
+	}
+	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
 	}
 

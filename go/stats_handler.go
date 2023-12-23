@@ -123,7 +123,7 @@ func getUserStatisticsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
 	}
 	userTips := []UserTips{}
-	query = `
+	query := `
 	SELECT
 		u.id,
 		u.name,

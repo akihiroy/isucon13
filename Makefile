@@ -90,7 +90,7 @@ mysql-restart:
 	$(MYSQL_RESTART)
 
 QUERY_DIGESTER=sudo query-digester -duration 10
-SHOW_DIGEST=bash scripts/show-digest.sh
+SHOW_DIGEST=bash scripts/query-digest.sh
 .PHONY: slowlog
 slowlog:
 	$(QUERY_DIGESTER)

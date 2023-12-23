@@ -140,7 +140,7 @@ func getUserStatisticsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
 	}
 	var i = 1
-	for _, user := range UserReactions {
+	for _, user := range userReactions {
 		score := userReactions[i].reaction_count + userTips[i].tip
 		ranking = append(ranking, UserRankingEntry{
 			Username: userReactions[i].name,

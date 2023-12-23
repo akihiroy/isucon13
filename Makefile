@@ -109,5 +109,5 @@ setup:
 
 .PHONY: bench
 bench: nginx-rotate restart
-	./bench run --enable-ssl
+	/home/isucon/bench run --enable-ssl
 	$(ALP)

@@ -95,6 +95,7 @@ func getIconHandler(c echo.Context) error {
 
 	// get If-None-Match header as Icon Hash
 	ifNoneMatch := c.Request().Header.Get("If-None-Match")
+	fmt.Printf("If-None-Match: %s\n", ifNoneMatch)
 	if _, ok := iconHash.Load(ifNoneMatch); ok {
 		return c.NoContent(http.StatusNotModified)
 	}

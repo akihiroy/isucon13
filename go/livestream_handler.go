@@ -411,7 +411,7 @@ func getLivestreamHandler(c echo.Context) error {
 	defer tx.Rollback()
 
 	livestreamModel := LivestreamModel{}
-	err = tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livestreamID)
+	err = sqlx.GetContext(ctx, dbConn, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livestreamID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return echo.NewHTTPError(http.StatusNotFound, "not found livestream that has the given id")
 	}

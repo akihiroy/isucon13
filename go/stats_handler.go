@@ -143,7 +143,7 @@ func getUserStatisticsHandler(c echo.Context) error {
 	for _, user := range userReactions {
 		score := user.reaction_count + userTips[i].tip
 		ranking = append(ranking, UserRankingEntry{
-			Username: user.name,
+			Username: user.Name,
 			Score: score,
 		})
 		i++
